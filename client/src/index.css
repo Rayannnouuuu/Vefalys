@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-[#f7faf8] text-brand-950 dark:bg-brand-950 dark:text-brand-50 antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+* {
+  @apply border-brand-100 dark:border-brand-800;
+}
+
+h1, h2, h3, .font-display {
+  font-family: 'Fraunces', ui-serif, Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  @apply bg-accent-200 text-brand-900;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-brand-200 dark:bg-brand-700;
+}

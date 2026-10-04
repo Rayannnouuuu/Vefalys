@@ -1,0 +1,663 @@
+// Schema de donnees complet - Gestion Commerciale et Comptable
+// NOTE: les champs de type "statut/categorie" sont stockes en String (pas en enum Prisma)
+// car SQLite (utilise en developpement) ne supporte pas les enums natifs Prisma.
+// La validation des valeurs autorisees se fait via des unions Zod cote application (src/lib/enums.ts).
+// Migration vers PostgreSQL en production : ces String pourront devenir des enums natifs sans
+// changer la forme des donnees.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =========================================================================
+// UTILISATEURS & SECURITE
+// =========================================================================
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         String   @default("COLLABORATEUR") // ADMIN | MANAGER | COLLABORATEUR
+  isActive     Boolean  @default(true)
+  avatarColor  String   @default("#2563eb")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedContacts      Contact[]          @relation("ContactOwner")
+  ownedOpportunities Opportunity[]      @relation("OpportunityOwner")
+  interactions       Interaction[]
+  relancesAssigned   Relance[]
+  tasksAssigned      Task[]             @relation("TaskAssignee")
+  tasksCreated       Task[]             @relation("TaskCreator")
+  appointments       Appointment[]
+  devisCreated       Devis[]
+  facturesCreated    Facture[]
+  depensesCreated    Depense[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  emailAccounts      EmailAccount[]
+  savedFilters       SavedFilter[]
+  generatedDocuments GeneratedDocument[]
+  attachments        Attachment[]
+  calendlyIntegrations CalendlyIntegration[]
+  prospectDocuments  ProspectDocument[]
+  comments           Comment[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String // CREATE | UPDATE | DELETE | LOGIN | STAGE_CHANGE | ...
+  entityType String // Contact | Opportunity | Facture | ...
+  entityId   String
+  metadata   String? // JSON stringifie
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+// =========================================================================
+// CRM - CONTACTS
+// =========================================================================
+
+model Contact {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  company     String?
+  sector      String?
+  location    String?
+  status      String   @default("PROSPECT_FROID")
+  // PROSPECT_CHAUD | PROSPECT_FROID | PROSPECT_RELANCE | CLIENT_ACTIF | CLIENT_INACTIF | PERDU
+  source      String   @default("AUTRE")
+  // DIRECT | RECOMMANDATION | SITE_WEB | RESEAUX_SOCIAUX | SALON | AUTRE
+  notes       String?
+  score       Int      @default(0)
+
+  // Criteres de recherche du prospect (budget, typologie, localisation, financement...)
+  budgetMin             Float?
+  budgetMax             Float?
+  typologieRecherchee   String?
+  localisationSouhaitee String?
+  financement           String?
+  criteresNotes         String?
+
+  // Checklist minimaliste du dossier (mandat + preuve de financement, rien de plus)
+  mandatSigned            Boolean   @default(false)
+  mandatSignedDate        DateTime?
+  financingProofUploaded  Boolean   @default(false)
+  financingProofDate      DateTime?
+
+  ownerId     String?
+  owner       User?    @relation("ContactOwner", fields: [ownerId], references: [id])
+  archivedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tags             ContactTag[]
+  interactions     Interaction[]
+  opportunities    Opportunity[]
+  relances         Relance[]
+  tasks            Task[]
+  appointments     Appointment[]
+  attachments      Attachment[]
+  devis            Devis[]
+  factures         Facture[]
+  prospectPrograms ProspectProgram[]
+  emailMessages    EmailMessage[]
+  documents        ProspectDocument[]
+  comments         Comment[]
+
+  @@index([status])
+  @@index([lastName, firstName])
+}
+
+// Archive documentaire par prospect (mandat, plans, attestation de financement...)
+model ProspectDocument {
+  id           String   @id @default(cuid())
+  contactId    String
+  contact      Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  name         String
+  type         String // MANDAT | PLANS | ATTESTATION_FINANCEMENT | AUTRE
+  filePath     String
+  uploadedAt   DateTime @default(now())
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
+
+  @@index([contactId])
+}
+
+// Commentaire d'equipe sur un contact (collaboration)
+model Comment {
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([contactId])
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  color String @default("#64748b")
+
+  contacts ContactTag[]
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+}
+
+model Interaction {
+  id         String   @id @default(cuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  type       String // APPEL | EMAIL | REUNION | MESSAGE | NOTE
+  subject    String?
+  content    String?
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([contactId])
+}
+
+model Attachment {
+  id                String   @id @default(cuid())
+  filename          String
+  path              String
+  mimeType          String?
+  size              Int?
+  uploadedById      String?
+  uploadedBy        User?    @relation(fields: [uploadedById], references: [id])
+  createdAt         DateTime @default(now())
+
+  contactId         String?
+  contact           Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  opportunityId     String?
+  opportunity       Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  depenseId         String?
+  depense           Depense? @relation(fields: [depenseId], references: [id], onDelete: Cascade)
+  prospectProgramId String?
+  prospectProgram   ProspectProgram? @relation(fields: [prospectProgramId], references: [id], onDelete: Cascade)
+}
+
+// =========================================================================
+// CRM - PIPELINE / OPPORTUNITES
+// =========================================================================
+
+model Opportunity {
+  id                String    @id @default(cuid())
+  title             String
+  contactId         String
+  contact           Contact   @relation(fields: [contactId], references: [id])
+  amount            Float     @default(0)
+  probability        Int       @default(50)
+  expectedCloseDate DateTime?
+  stage             String    @default("PROSPECT")
+  // PROSPECT | DEVIS | NEGOCIATION | CONTRAT_SIGNE | FERME_GAGNE | FERME_PERDU
+  description       String?
+  lostReason         String?
+  ownerId           String?
+  owner             User?     @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  closedAt          DateTime?
+
+  history      OpportunityHistory[]
+  relances     Relance[]
+  tasks        Task[]
+  appointments Appointment[]
+  attachments  Attachment[]
+  devis        Devis[]
+  factures     Facture[]
+
+  @@index([stage])
+}
+
+model OpportunityHistory {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  fromStage     String?
+  toStage       String
+  changedById   String?
+  changedAt     DateTime    @default(now())
+}
+
+// =========================================================================
+// CRM - RELANCES
+// =========================================================================
+
+model RelanceTemplate {
+  id      String  @id @default(cuid())
+  name    String
+  channel String  @default("EMAIL") // EMAIL | SMS
+  subject String?
+  body    String
+
+  relances Relance[]
+}
+
+model Relance {
+  id            String       @id @default(cuid())
+  contactId     String?
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  type          String // RELANCE_PROSPECT | RELANCE_DEVIS | SUIVI_PROJET | COMMANDE_RECURRENTE | AUTRE
+  dueDate       DateTime
+  status        String       @default("A_FAIRE") // A_FAIRE | FAITE | ANNULEE
+  note          String?
+  assignedToId  String?
+  assignedTo    User?        @relation(fields: [assignedToId], references: [id])
+  templateId    String?
+  template      RelanceTemplate? @relation(fields: [templateId], references: [id])
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([dueDate, status])
+}
+
+// =========================================================================
+// IMMOBILIER VEFA - PROGRAMMES
+// =========================================================================
+
+model Program {
+  id             String   @id @default(cuid())
+  name           String
+  promoterName   String
+  address        String
+  city           String
+  postalCode     String?
+  deliveryDate   DateTime?
+  status         String   @default("PROSPECTION") // PROSPECTION | EN_VENTE | EN_CONSTRUCTION | LIVRE
+  description    String?
+  pricePerM2Avg  Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  units            ProgramUnit[]
+  documents        ProgramDocument[]
+  prospectPrograms ProspectProgram[]
+}
+
+model ProgramUnit {
+  id        String  @id @default(cuid())
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  reference String
+  typology  String // T1 | T2 | T3 | T4 | T5
+  floor     Int?
+  surface   Float?
+  price     Float?
+  status    String  @default("DISPONIBLE") // DISPONIBLE | RESERVE | VENDU
+
+  prospectPrograms ProspectProgram[]
+
+  @@index([programId, typology])
+}
+
+model ProgramDocument {
+  id        String   @id @default(cuid())
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  name      String
+  type      String // PLAN | FICHE_TECHNIQUE | DPE | PERMIS_CONSTRUIRE | AUTRE
+  path      String
+  createdAt DateTime @default(now())
+}
+
+// Association prospect <-> programme (= un "dossier" de vente VEFA)
+model ProspectProgram {
+  id                   String    @id @default(cuid())
+  contactId            String
+  contact              Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  programId            String
+  program              Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  unitId               String?
+  unit                 ProgramUnit? @relation(fields: [unitId], references: [id])
+  stage                String    @default("PROSPECTION")
+  // PROSPECTION | VISITE | OFFRE_PRELIMINAIRE | DEMANDE_FINANCEMENT | PROMESSE_VENTE | COMPROMIS | ACTE_SIGNE | PERDU
+  interestedTypology   String?
+  offerPrice           Float?
+  financingCondition   String?
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt             DateTime @updatedAt
+  signedAt             DateTime?
+
+  dossierPieces       DossierPiece[]
+  generatedDocuments  GeneratedDocument[]
+  commissions         Commission[]
+  attachments         Attachment[]
+  factures            Facture[]
+  stageHistory        ProspectProgramHistory[]
+
+  @@index([stage])
+  @@unique([contactId, programId, unitId])
+}
+
+model ProspectProgramHistory {
+  id                String          @id @default(cuid())
+  prospectProgramId String
+  prospectProgram   ProspectProgram @relation(fields: [prospectProgramId], references: [id], onDelete: Cascade)
+  fromStage         String?
+  toStage           String
+  changedAt         DateTime        @default(now())
+}
+
+model DossierPiece {
+  id                String          @id @default(cuid())
+  prospectProgramId String
+  prospectProgram   ProspectProgram @relation(fields: [prospectProgramId], references: [id], onDelete: Cascade)
+  type              String
+  // PIECE_IDENTITE | JUSTIFICATIF_REVENUS | PREUVE_FINANCEMENT | ASSURANCE_EMPRUNTEUR | AUTRE
+  status            String          @default("MANQUANT") // MANQUANT | RECU | VALIDE
+  receivedAt        DateTime?
+  note              String?
+}
+
+model GeneratedDocument {
+  id                String          @id @default(cuid())
+  prospectProgramId String
+  prospectProgram   ProspectProgram @relation(fields: [prospectProgramId], references: [id], onDelete: Cascade)
+  type              String
+  // MANDAT_VENTE | OFFRE_ACHAT | COMPROMIS_VENTE | FACTURE_COMMISSION
+  content           String // HTML genere, snapshot au moment de la generation
+  generatedById     String?
+  generatedBy       User?           @relation(fields: [generatedById], references: [id])
+  generatedAt       DateTime        @default(now())
+}
+
+model Commission {
+  id                String          @id @default(cuid())
+  prospectProgramId String
+  prospectProgram   ProspectProgram @relation(fields: [prospectProgramId], references: [id], onDelete: Cascade)
+  type              String // PROMESSE | COMPROMIS | ACTE
+  rate              Float // en %
+  amount            Float
+  status            String          @default("A_PERCEVOIR") // A_PERCEVOIR | FACTUREE | PAYEE
+  dueDate           DateTime?
+  factureId         String?
+  facture           Facture?        @relation(fields: [factureId], references: [id])
+  createdAt         DateTime        @default(now())
+}
+
+// =========================================================================
+// COMPTABILITE - DEVIS / FACTURES / PAIEMENTS / DEPENSES
+// =========================================================================
+
+model Devis {
+  id            String   @id @default(cuid())
+  number        String   @unique
+  contactId     String
+  contact       Contact  @relation(fields: [contactId], references: [id])
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
+  status        String   @default("BROUILLON") // BROUILLON | ENVOYE | ACCEPTE | REJETE | FACTURE
+  issueDate     DateTime @default(now())
+  validUntil    DateTime?
+  paymentTerms  String?
+  notes         String?
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items    DevisItem[]
+  factures Facture[]
+
+  @@index([status])
+}
+
+model DevisItem {
+  id          String @id @default(cuid())
+  devisId     String
+  devis       Devis  @relation(fields: [devisId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float  @default(1)
+  unitPrice   Float
+  vatRate     Float  @default(20)
+}
+
+model Facture {
+  id                String   @id @default(cuid())
+  number            String   @unique
+  promoterName      String? // promoteur a facturer - entite principale de la facture
+  contactId         String
+  contact           Contact  @relation(fields: [contactId], references: [id])
+  devisId           String?
+  devis             Devis?   @relation(fields: [devisId], references: [id])
+  opportunityId     String?
+  opportunity       Opportunity? @relation(fields: [opportunityId], references: [id])
+  prospectProgramId String?
+  prospectProgram   ProspectProgram? @relation(fields: [prospectProgramId], references: [id])
+  status            String   @default("BROUILLON")
+  // BROUILLON | ENVOYEE | PAYEE | PARTIELLEMENT_PAYEE | IMPAYEE | ANNULEE
+  reference         String? // reference/numero de la facture telle que recue (promoteur, fournisseur...)
+  attachmentPath    String? // fichier de la facture importee
+  issueDate         DateTime @default(now())
+  dueDate           DateTime?
+  notes             String?
+  isAvoir           Boolean  @default(false)
+  originalFactureId String?
+  createdById       String?
+  createdBy         User?    @relation(fields: [createdById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  items       FactureItem[]
+  paiements   Paiement[]
+  commissions Commission[]
+
+  @@index([status])
+}
+
+model FactureItem {
+  id          String  @id @default(cuid())
+  factureId   String
+  facture     Facture @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  vatRate     Float   @default(20)
+}
+
+model Paiement {
+  id        String   @id @default(cuid())
+  factureId String
+  facture   Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  amount    Float
+  date      DateTime @default(now())
+  method    String // VIREMENT | CHEQUE | ESPECES | CB | AUTRE
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model Depense {
+  id             String   @id @default(cuid())
+  category       String // FOURNITURES | TRANSPORT | PRESTATION | LOYER | MARKETING | AUTRE
+  amount         Float
+  date           DateTime @default(now())
+  description    String?
+  accountingCode String?
+  receiptPath    String?
+  createdById    String?
+  createdBy      User?    @relation(fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+
+  attachments Attachment[]
+
+  @@index([category, date])
+}
+
+model Budget {
+  id       String @id @default(cuid())
+  category String
+  amount   Float
+  year     Int
+  month    Int
+
+  @@unique([category, year, month])
+}
+
+// =========================================================================
+// AGENDA & TACHES
+// =========================================================================
+
+model Task {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  dueDate       DateTime?
+  priority      String    @default("MOYENNE") // BASSE | MOYENNE | HAUTE | URGENTE
+  status        String    @default("A_FAIRE") // A_FAIRE | EN_COURS | TERMINEE | BLOQUEE
+  assignedToId  String?
+  assignedTo    User?     @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdById   String?
+  createdBy     User?     @relation("TaskCreator", fields: [createdById], references: [id])
+  contactId     String?
+  contact       Contact?  @relation(fields: [contactId], references: [id])
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
+  recurrence    String    @default("NONE") // NONE | WEEKLY | MONTHLY
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, dueDate])
+}
+
+model Appointment {
+  id                    String    @id @default(cuid())
+  title                 String
+  type                  String    @default("RDV_PHYSIQUE") // APPEL | VISIO | RDV_PHYSIQUE
+  startAt               DateTime
+  endAt                 DateTime
+  location              String?
+  description           String?
+  contactId             String?
+  contact               Contact?  @relation(fields: [contactId], references: [id])
+  opportunityId         String?
+  opportunity           Opportunity? @relation(fields: [opportunityId], references: [id])
+  createdById           String?
+  createdBy             User?     @relation(fields: [createdById], references: [id])
+  reminderMinutesBefore Int       @default(60)
+  createdAt             DateTime  @default(now())
+
+  // Renseigne quand le RDV provient d'une synchronisation Calendly (evite les doublons)
+  calendlyEventUri      String?   @unique
+  source                String    @default("MANUEL") // MANUEL | CALENDLY
+
+  @@index([startAt])
+}
+
+// =========================================================================
+// INTEGRATION CALENDLY
+// =========================================================================
+
+model CalendlyIntegration {
+  id                   String    @id @default(cuid())
+  accessToken          String
+  calendlyUserUri      String
+  calendlyUserName     String?
+  calendlyUserEmail    String?
+  organizationUri      String?
+  webhookSubscriptionUri String?
+  signingKey           String?
+  connectedById        String?
+  connectedBy          User?     @relation(fields: [connectedById], references: [id])
+  lastSyncAt           DateTime?
+  createdAt            DateTime  @default(now())
+}
+
+// =========================================================================
+// NOTIFICATIONS
+// =========================================================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // RELANCE | FACTURE_IMPAYEE | RDV | OPPORTUNITE | SYSTEME
+  title     String
+  message   String?
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+// =========================================================================
+// INTEGRATION EMAIL (Phase 1)
+// =========================================================================
+
+model EmailAccount {
+  id                   String    @id @default(cuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider             String // GMAIL | OUTLOOK | AUTRE
+  emailAddress         String
+  imapHost             String?
+  imapPort             Int?
+  smtpHost             String?
+  smtpPort             Int?
+  encryptedCredentials String?
+  lastSyncAt           DateTime?
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+
+  messages EmailMessage[]
+}
+
+model EmailMessage {
+  id             String       @id @default(cuid())
+  emailAccountId String
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id])
+  messageId      String       @unique
+  fromAddress    String
+  toAddress      String
+  subject        String?
+  bodyPreview    String?
+  direction      String // IN | OUT
+  receivedAt     DateTime
+  isArchived     Boolean      @default(false)
+}
+
+// =========================================================================
+// RECHERCHE / VUES SAUVEGARDEES
+// =========================================================================
+
+model SavedFilter {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  entityType String // CONTACT | OPPORTUNITY | FACTURE | PROSPECT_PROGRAM
+  filterJson String
+
+  createdAt DateTime @default(now())
+}

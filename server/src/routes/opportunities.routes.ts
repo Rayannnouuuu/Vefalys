@@ -2,9 +2,10 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { asyncHandler, HttpError } from '../middleware/errorHandler'
-import { authenticate, requireRole, type AuthedRequest } from '../middleware/auth'
+import { authenticate, type AuthedRequest } from '../middleware/auth'
 import { OPPORTUNITY_STAGES } from '../lib/enums'
 import { logAudit } from '../lib/audit'
+import { requirePermission } from '../lib/permissions'
 
 const router = Router()
 router.use(authenticate)
@@ -137,7 +138,7 @@ router.patch(
 
 router.delete(
   '/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requirePermission('COLLAB_DELETE_OPPORTUNITIES'),
   asyncHandler(async (req: AuthedRequest, res) => {
     await prisma.opportunity.delete({ where: { id: req.params.id } })
     await logAudit(req.user!.id, 'DELETE', 'Opportunity', req.params.id)

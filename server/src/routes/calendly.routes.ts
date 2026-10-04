@@ -5,35 +5,37 @@ import { prisma } from '../lib/prisma'
 import { asyncHandler, HttpError } from '../middleware/errorHandler'
 import { authenticate, requireRole, type AuthedRequest } from '../middleware/auth'
 import { getCalendlyCurrentUser, createCalendlyWebhookSubscription, deleteCalendlyWebhookSubscription, CalendlyApiError } from '../lib/calendly'
-import { syncCalendlyEvents, cancelCalendlyAppointment } from '../services/calendlySync.service'
+import { syncCalendlyForUser, syncAllCalendlyIntegrations, cancelCalendlyAppointment } from '../services/calendlySync.service'
 import { logAudit } from '../lib/audit'
 
 const router = Router()
 
 // --- Webhook public (appele par Calendly, pas d'auth utilisateur) ---
+// Chaque collaborateur a sa propre souscription webhook (signee avec sa propre cle), donc on
+// essaie la signature contre chaque integration connue plutot que de supposer une seule
+// integration globale. Sur un petit effectif d'equipe, le cout est negligeable.
 router.post(
   '/webhook',
   asyncHandler(async (req, res) => {
-    const integration = await prisma.calendlyIntegration.findFirst()
-    if (integration?.webhookSubscriptionUri) {
-      const signatureHeader = req.headers['calendly-webhook-signature'] as string | undefined
-      const signingKey = integration.signingKey
-      if (signingKey && signatureHeader) {
-        const parts = Object.fromEntries(signatureHeader.split(',').map((p) => p.split('=')))
+    const integrations = await prisma.calendlyIntegration.findMany()
+    const signatureHeader = req.headers['calendly-webhook-signature'] as string | undefined
+    if (integrations.length && signatureHeader) {
+      const parts = Object.fromEntries(signatureHeader.split(',').map((p) => p.split('=')))
+      const matches = integrations.some((integration) => {
+        if (!integration.signingKey) return false
         const expected = crypto
-          .createHmac('sha256', signingKey)
+          .createHmac('sha256', integration.signingKey)
           .update(`${parts.t}.${(req as any).rawBody}`)
           .digest('hex')
-        if (expected !== parts.v1) {
-          throw new HttpError(401, 'Signature webhook invalide')
-        }
-      }
+        return expected === parts.v1
+      })
+      if (!matches) throw new HttpError(401, 'Signature webhook invalide')
     }
 
     const event = req.body?.event
     const payload = req.body?.payload
     if (event === 'invitee.created' && payload?.event) {
-      await syncCalendlyEvents()
+      await syncAllCalendlyIntegrations()
     } else if (event === 'invitee.canceled' && payload?.event?.uri) {
       await cancelCalendlyAppointment(payload.event.uri)
     }
@@ -45,8 +47,8 @@ router.use(authenticate)
 
 router.get(
   '/status',
-  asyncHandler(async (_req, res) => {
-    const integration = await prisma.calendlyIntegration.findFirst()
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const integration = await prisma.calendlyIntegration.findUnique({ where: { connectedById: req.user!.id } })
     if (!integration) return res.json({ connected: false })
     res.json({
       connected: true,
@@ -58,11 +60,37 @@ router.get(
   }),
 )
 
+// Vue d'ensemble pour l'administrateur : qui, dans l'equipe, a connecte son Calendly personnel.
+router.get(
+  '/team',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (_req, res) => {
+    const [integrations, users] = await Promise.all([
+      prisma.calendlyIntegration.findMany({ include: { connectedBy: { select: { id: true, firstName: true, lastName: true, avatarColor: true, role: true } } } }),
+      prisma.user.findMany({ where: { isActive: true }, select: { id: true, firstName: true, lastName: true, avatarColor: true, role: true } }),
+    ])
+    const byUserId = new Map(integrations.map((i) => [i.connectedById, i]))
+    const team = users.map((u) => {
+      const integration = byUserId.get(u.id)
+      return {
+        user: u,
+        connected: !!integration,
+        calendlyUserName: integration?.calendlyUserName || null,
+        calendlyUserEmail: integration?.calendlyUserEmail || null,
+        lastSyncAt: integration?.lastSyncAt || null,
+        webhookActive: !!integration?.webhookSubscriptionUri,
+      }
+    })
+    res.json(team)
+  }),
+)
+
 const connectSchema = z.object({ accessToken: z.string().min(10) })
 
+// N'importe quel collaborateur peut connecter SON PROPRE compte Calendly (jeton personnel) :
+// ce n'est plus reserve a l'admin/manager, chacun gere son propre calendrier.
 router.post(
   '/connect',
-  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req: AuthedRequest, res) => {
     const { accessToken } = connectSchema.parse(req.body)
 
@@ -74,7 +102,10 @@ router.post(
       throw err
     }
 
-    await prisma.calendlyIntegration.deleteMany({})
+    const existing = await prisma.calendlyIntegration.findUnique({ where: { connectedById: req.user!.id } })
+    if (existing?.webhookSubscriptionUri) {
+      await deleteCalendlyWebhookSubscription(existing.accessToken, existing.webhookSubscriptionUri).catch(() => {})
+    }
 
     let webhookSubscriptionUri: string | undefined
     let signingKey: string | undefined
@@ -89,8 +120,18 @@ router.post(
       }
     }
 
-    const integration = await prisma.calendlyIntegration.create({
-      data: {
+    const integration = await prisma.calendlyIntegration.upsert({
+      where: { connectedById: req.user!.id },
+      update: {
+        accessToken,
+        calendlyUserUri: calendlyUser.uri,
+        calendlyUserName: calendlyUser.name,
+        calendlyUserEmail: calendlyUser.email,
+        organizationUri: calendlyUser.current_organization,
+        webhookSubscriptionUri,
+        signingKey,
+      },
+      create: {
         accessToken,
         calendlyUserUri: calendlyUser.uri,
         calendlyUserName: calendlyUser.name,
@@ -104,7 +145,7 @@ router.post(
 
     await logAudit(req.user!.id, 'CONNECT', 'CalendlyIntegration', integration.id, { user: calendlyUser.email })
 
-    const result = await syncCalendlyEvents()
+    const result = await syncCalendlyForUser(req.user!.id)
 
     res.status(201).json({
       connected: true,
@@ -118,9 +159,8 @@ router.post(
 
 router.post(
   '/disconnect',
-  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req: AuthedRequest, res) => {
-    const integration = await prisma.calendlyIntegration.findFirst()
+    const integration = await prisma.calendlyIntegration.findUnique({ where: { connectedById: req.user!.id } })
     if (integration) {
       if (integration.webhookSubscriptionUri) {
         await deleteCalendlyWebhookSubscription(integration.accessToken, integration.webhookSubscriptionUri).catch(() => {})
@@ -134,8 +174,18 @@ router.post(
 
 router.post(
   '/sync',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const result = await syncCalendlyForUser(req.user!.id)
+    res.json(result)
+  }),
+)
+
+// Synchronise d'un coup les calendriers de tous les collaborateurs connectes.
+router.post(
+  '/sync-all',
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
-    const result = await syncCalendlyEvents()
+    const result = await syncAllCalendlyIntegrations()
     res.json(result)
   }),
 )

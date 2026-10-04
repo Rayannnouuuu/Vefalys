@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+﻿import { Link } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Logo } from '../../components/Logo'
 
 const LEGAL_NAV = [
   { to: '/mentions-legales', label: 'Mentions legales' },
@@ -10,12 +11,11 @@ const LEGAL_NAV = [
 
 export default function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#f7faf8]">
+    <div className="min-h-screen bg-brand-50">
       <header className="border-b border-brand-100 bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-accent-400 to-accent-600 font-serif text-sm font-semibold text-white">V</div>
-          <Link to="/" className="font-serif text-lg font-medium text-brand-900">Vefalys</Link>
-        </div>
+        <Link to="/" className="mx-auto block max-w-3xl">
+          <Logo />
+        </Link>
       </header>
       <main className="mx-auto max-w-3xl px-6 py-10">
         <nav className="mb-8 flex flex-wrap gap-4 text-sm">
@@ -35,7 +35,7 @@ export default function LegalLayout({ title, children }: { title: string; childr
           </p>
         </div>
 
-        <h1 className="mb-6 font-serif text-2xl font-medium text-brand-900">{title}</h1>
+        <h1 className="mb-6 font-serif text-2xl font-semibold text-brand-900">{title}</h1>
         <div className="prose-legal space-y-4 text-sm leading-relaxed text-brand-700">{children}</div>
       </main>
     </div>

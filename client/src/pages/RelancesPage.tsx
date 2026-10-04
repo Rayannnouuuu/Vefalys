@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'motion/react'
 import { format, isToday, isTomorrow, isPast } from 'date-fns'
@@ -43,7 +43,7 @@ export default function RelancesPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-4">
-      <h1 className="font-serif text-2xl font-medium text-brand-900">Calendrier des relances</h1>
+      <h1 className="font-serif text-2xl font-semibold text-brand-900">Calendrier des relances</h1>
 
       <div className="flex gap-2">
         {([
@@ -78,7 +78,7 @@ export default function RelancesPage() {
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <Badge label={labelFor(RELANCE_TYPES, r.type)} color={overdue ? '#dc2626' : '#397a52'} />
+                    <Badge label={labelFor(RELANCE_TYPES, r.type)} color={overdue ? '#dc2626' : '#2d5c44'} />
                     <span className="text-sm text-brand-400">{format(new Date(r.dueDate), 'dd/MM/yyyy')}</span>
                   </div>
                   {r.contact && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { format } from 'date-fns'
@@ -6,7 +6,7 @@ import { Plus, Trash2, Pencil } from 'lucide-react'
 import { api, apiErrorMessage } from '../lib/api'
 import { Card, Button, Modal, Label, Input, Select, Textarea, Badge, EmptyState } from '../components/ui'
 import { DEPENSE_CATEGORIES, labelFor } from '../lib/enums'
-import { useAuthStore } from '../store/auth'
+import { useCan } from '../lib/permissions'
 import type { Depense } from '../types'
 
 export default function DepensesPage() {
@@ -14,8 +14,7 @@ export default function DepensesPage() {
   const [editing, setEditing] = useState<Depense | null>(null)
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
-  const currentUser = useAuthStore((s) => s.user)
-  const canDelete = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+  const canDelete = useCan('COLLAB_DELETE_DEPENSES')
   const { data: depenses } = useQuery<Depense[]>({ queryKey: ['depenses'], queryFn: () => api.get('/depenses').then((r) => r.data) })
 
   async function remove(id: string) {
@@ -34,7 +33,7 @@ export default function DepensesPage() {
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-2xl font-medium text-brand-900">Depenses</h1>
+          <h1 className="font-serif text-2xl font-semibold text-brand-900">Depenses</h1>
           <p className="text-sm text-brand-400">Total enregistre : {total.toLocaleString('fr-FR')} EUR</p>
         </div>
         <Button onClick={() => setShowCreate(true)}><Plus size={16} /> Nouvelle depense</Button>

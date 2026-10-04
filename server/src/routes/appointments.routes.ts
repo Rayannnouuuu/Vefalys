@@ -20,7 +20,11 @@ router.get(
     }
     const appointments = await prisma.appointment.findMany({
       where,
-      include: { contact: { select: { id: true, firstName: true, lastName: true } }, opportunity: { select: { id: true, title: true } } },
+      include: {
+        contact: { select: { id: true, firstName: true, lastName: true } },
+        opportunity: { select: { id: true, title: true } },
+        createdBy: { select: { id: true, firstName: true, lastName: true, avatarColor: true } },
+      },
       orderBy: { startAt: 'asc' },
     })
     res.json(appointments)

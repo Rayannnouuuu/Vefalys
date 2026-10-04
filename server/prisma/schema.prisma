@@ -30,6 +30,20 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Site prive : un compte auto-cree (inscription publique) doit confirmer son email puis
+  // etre valide par un administrateur avant de pouvoir se connecter. Les comptes crees
+  // directement par un admin/manager depuis les parametres sont deja verifies/approuves
+  // (valeurs par defaut ci-dessous) - seule l'inscription publique force explicitement
+  // emailVerified=false et approvalStatus='PENDING' a la creation.
+  emailVerified            Boolean   @default(true)
+  emailVerificationToken   String?   @unique
+  emailVerificationExpires DateTime?
+  approvalStatus           String    @default("APPROVED") // PENDING | APPROVED | REJECTED
+  approvedById             String?
+  approvedBy               User?     @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt               DateTime?
+  rejectedReason           String?
+
   ownedContacts      Contact[]          @relation("ContactOwner")
   ownedOpportunities Opportunity[]      @relation("OpportunityOwner")
   interactions       Interaction[]
@@ -46,15 +60,17 @@ model User {
   savedFilters       SavedFilter[]
   generatedDocuments GeneratedDocument[]
   attachments        Attachment[]
-  calendlyIntegrations CalendlyIntegration[]
+  calendlyIntegration  CalendlyIntegration?
   prospectDocuments  ProspectDocument[]
   comments           Comment[]
+  financialSimulations FinancialSimulation[]
+  approvalsGiven     User[]             @relation("UserApprovals")
 }
 
 model AuditLog {
   id         String   @id @default(cuid())
   userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   action     String // CREATE | UPDATE | DELETE | LOGIN | STAGE_CHANGE | ...
   entityType String // Contact | Opportunity | Facture | ...
   entityId   String
@@ -99,7 +115,7 @@ model Contact {
   financingProofDate      DateTime?
 
   ownerId     String?
-  owner       User?    @relation("ContactOwner", fields: [ownerId], references: [id])
+  owner       User?    @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   archivedAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -117,9 +133,57 @@ model Contact {
   emailMessages    EmailMessage[]
   documents        ProspectDocument[]
   comments         Comment[]
+  simulations      FinancialSimulation[]
 
   @@index([status])
   @@index([lastName, firstName])
+}
+
+// Simulation de financement (capacite d'emprunt, PTZ, frais de notaire...), calquee sur le
+// simulateur public de vefalys.fr/financement.html. Rattachee a un contact pour suivre le
+// budget estime d'un prospect au fil de ses relances.
+model FinancialSimulation {
+  id        String   @id @default(cuid())
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  label     String?
+
+  // Entrees du simulateur
+  objectif              String  @default("PRINCIPALE") // PRINCIPALE | LOCATIF | SECONDAIRE
+  typeBien              String  @default("APPARTEMENT_NEUF")
+  // APPARTEMENT_NEUF | MAISON_NEUVE | APPARTEMENT_ANCIEN | MAISON_ANCIENNE
+  primoAccedant         Boolean @default(true)
+  revenusMensuels       Float
+  chargesMensuelles     Float   @default(0)
+  apport                Float   @default(0)
+  dureeAnnees           Int     @default(20)
+  tauxPersonnalise      Float?
+  personnesFoyer        Int     @default(1)
+  zone                  String  @default("A") // A | B1 | B2 | C
+  revenuFiscalReference Float?
+  prixBienVise          Float?
+
+  // Resultats (snapshot calcule au moment de l'enregistrement)
+  tauxApplique        Float
+  mensualiteMax        Float
+  capaciteEmprunt      Float
+  fraisNotaire         Float
+  coutInterets         Float
+  tauxEndettement      Float
+  budgetFinancable     Float
+  ptzEligible          Boolean @default(false)
+  ptzMontant           Float?
+  ptzMotifInegibilite  String?
+  budgetTotalAvecPtz   Float?
+  cibleMensualite           Float?
+  cibleMargeMensuelle       Float?
+  cibleApportSupplementaire Float?
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([contactId])
 }
 
 // Archive documentaire par prospect (mandat, plans, attestation de financement...)
@@ -132,7 +196,7 @@ model ProspectDocument {
   filePath     String
   uploadedAt   DateTime @default(now())
   uploadedById String?
-  uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([contactId])
 }
@@ -143,7 +207,7 @@ model Comment {
   contactId String
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   body      String
   createdAt DateTime @default(now())
 
@@ -172,7 +236,7 @@ model Interaction {
   contactId  String
   contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   type       String // APPEL | EMAIL | REUNION | MESSAGE | NOTE
   subject    String?
   content    String?
@@ -189,7 +253,7 @@ model Attachment {
   mimeType          String?
   size              Int?
   uploadedById      String?
-  uploadedBy        User?    @relation(fields: [uploadedById], references: [id])
+  uploadedBy        User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())
 
   contactId         String?
@@ -219,7 +283,7 @@ model Opportunity {
   description       String?
   lostReason         String?
   ownerId           String?
-  owner             User?     @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  owner             User?     @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   closedAt          DateTime?
@@ -270,7 +334,7 @@ model Relance {
   status        String       @default("A_FAIRE") // A_FAIRE | FAITE | ANNULEE
   note          String?
   assignedToId  String?
-  assignedTo    User?        @relation(fields: [assignedToId], references: [id])
+  assignedTo    User?        @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   templateId    String?
   template      RelanceTemplate? @relation(fields: [templateId], references: [id])
   completedAt   DateTime?
@@ -386,7 +450,7 @@ model GeneratedDocument {
   // MANDAT_VENTE | OFFRE_ACHAT | COMPROMIS_VENTE | FACTURE_COMMISSION
   content           String // HTML genere, snapshot au moment de la generation
   generatedById     String?
-  generatedBy       User?           @relation(fields: [generatedById], references: [id])
+  generatedBy       User?           @relation(fields: [generatedById], references: [id], onDelete: SetNull)
   generatedAt       DateTime        @default(now())
 }
 
@@ -421,7 +485,7 @@ model Devis {
   paymentTerms  String?
   notes         String?
   createdById   String?
-  createdBy     User?    @relation(fields: [createdById], references: [id])
+  createdBy     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -463,7 +527,7 @@ model Facture {
   isAvoir           Boolean  @default(false)
   originalFactureId String?
   createdById       String?
-  createdBy         User?    @relation(fields: [createdById], references: [id])
+  createdBy         User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -504,7 +568,7 @@ model Depense {
   accountingCode String?
   receiptPath    String?
   createdById    String?
-  createdBy      User?    @relation(fields: [createdById], references: [id])
+  createdBy      User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
 
   attachments Attachment[]
@@ -534,9 +598,9 @@ model Task {
   priority      String    @default("MOYENNE") // BASSE | MOYENNE | HAUTE | URGENTE
   status        String    @default("A_FAIRE") // A_FAIRE | EN_COURS | TERMINEE | BLOQUEE
   assignedToId  String?
-  assignedTo    User?     @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assignedTo    User?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdById   String?
-  createdBy     User?     @relation("TaskCreator", fields: [createdById], references: [id])
+  createdBy     User?     @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
   contactId     String?
   contact       Contact?  @relation(fields: [contactId], references: [id])
   opportunityId String?
@@ -561,7 +625,7 @@ model Appointment {
   opportunityId         String?
   opportunity           Opportunity? @relation(fields: [opportunityId], references: [id])
   createdById           String?
-  createdBy             User?     @relation(fields: [createdById], references: [id])
+  createdBy             User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
   reminderMinutesBefore Int       @default(60)
   createdAt             DateTime  @default(now())
 
@@ -576,6 +640,10 @@ model Appointment {
 // INTEGRATION CALENDLY
 // =========================================================================
 
+// Chaque collaborateur connecte son propre compte Calendly (jeton personnel) : une ligne par
+// utilisateur, jamais une seule integration globale. L'admin voit l'etat de connexion de toute
+// l'equipe via GET /calendly/team ; les rendez-vous synchronises restent attribues a leur
+// proprietaire via Appointment.createdById.
 model CalendlyIntegration {
   id                   String    @id @default(cuid())
   accessToken          String
@@ -585,8 +653,8 @@ model CalendlyIntegration {
   organizationUri      String?
   webhookSubscriptionUri String?
   signingKey           String?
-  connectedById        String?
-  connectedBy          User?     @relation(fields: [connectedById], references: [id])
+  connectedById        String    @unique
+  connectedBy          User      @relation(fields: [connectedById], references: [id], onDelete: Cascade)
   lastSyncAt           DateTime?
   createdAt            DateTime  @default(now())
 }
@@ -607,6 +675,21 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read])
+}
+
+// =========================================================================
+// PERMISSIONS (parametrables par l'admin, au-dela des roles fixes)
+// =========================================================================
+
+// Role ADMIN = toujours tout autorise (jamais stocke ici). Role MANAGER = toujours autorise
+// comme aujourd'hui (comportement historique inchange). Ces lignes ne font qu'etendre ou non
+// les droits du role COLLABORATEUR, qui reste restreint par defaut si aucune ligne n'existe
+// pour une cle donnee (voir les valeurs par defaut dans server/src/lib/permissions.ts).
+model Permission {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
 }
 
 // =========================================================================

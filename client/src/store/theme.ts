@@ -1,26 +1,51 @@
 import { create } from 'zustand'
 
+export type ThemeMode = 'light' | 'dark' | 'black' | 'system'
+
 interface ThemeState {
-  dark: boolean
-  toggle: () => void
+  mode: ThemeMode
+  dark: boolean // etat visuel resolu (true si sombre ou noir, ou systeme resolu en sombre)
+  setMode: (mode: ThemeMode) => void
+  toggle: () => void // bascule rapide clair/sombre depuis l'icone du header
 }
 
-// Clair par defaut (identite visuelle pensee pour le mode clair) - le mode sombre reste
-// disponible via le bouton bascule et le choix de l'utilisateur est memorise.
-const stored = localStorage.getItem('theme')
-const initialDark = stored === 'dark'
+// Migration depuis l'ancien stockage booleen clair/sombre (avant l'ajout du theme noir et du
+// mode systeme).
+const legacy = localStorage.getItem('theme')
+const stored = (localStorage.getItem('themeMode') as ThemeMode | null) || (legacy === 'dark' ? 'dark' : 'light')
+const media = window.matchMedia('(prefers-color-scheme: dark)')
 
-function applyClass(dark: boolean) {
+function resolveDark(mode: ThemeMode) {
+  if (mode === 'system') return media.matches
+  return mode === 'dark' || mode === 'black'
+}
+
+function applyClasses(mode: ThemeMode) {
+  const dark = resolveDark(mode)
   document.documentElement.classList.toggle('dark', dark)
+  document.documentElement.classList.toggle('theme-black', mode === 'black')
 }
-applyClass(initialDark)
+applyClasses(stored)
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  dark: initialDark,
+  mode: stored,
+  dark: resolveDark(stored),
+  setMode: (mode) => {
+    localStorage.setItem('themeMode', mode)
+    applyClasses(mode)
+    set({ mode, dark: resolveDark(mode) })
+  },
   toggle: () => {
-    const next = !get().dark
-    localStorage.setItem('theme', next ? 'dark' : 'light')
-    applyClass(next)
-    set({ dark: next })
+    const next: ThemeMode = get().dark ? 'light' : 'dark'
+    localStorage.setItem('themeMode', next)
+    applyClasses(next)
+    set({ mode: next, dark: resolveDark(next) })
   },
 }))
+
+media.addEventListener('change', () => {
+  if (useThemeStore.getState().mode === 'system') {
+    applyClasses('system')
+    useThemeStore.setState({ dark: resolveDark('system') })
+  }
+})

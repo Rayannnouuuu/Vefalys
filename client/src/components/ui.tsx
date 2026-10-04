@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
+﻿import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
@@ -7,7 +7,7 @@ export function Badge({ label, color }: { label: string; color?: string }) {
   return (
     <span
       className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium tracking-wide"
-      style={{ backgroundColor: `${color || '#397a52'}14`, color: color || '#2e6243' }}
+      style={{ backgroundColor: `${color || '#2d5c44'}14`, color: color || '#234a36' }}
     >
       {label}
     </span>
@@ -27,8 +27,8 @@ export function Button({
       transition={{ duration: 0.12 }}
       className={clsx(
         'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50',
-        variant === 'primary' && 'bg-brand-800 text-white hover:bg-brand-900',
-        variant === 'accent' && 'bg-accent-500 text-white hover:bg-accent-600',
+        variant === 'primary' && 'bg-brand-800 text-white hover:bg-brand-900 dark:bg-brand-500 dark:hover:bg-brand-400',
+        variant === 'accent' && 'bg-accent-400 text-white hover:bg-accent-500',
         variant === 'secondary' && 'bg-brand-50 text-brand-800 hover:bg-brand-100 dark:bg-brand-800 dark:text-brand-100 dark:hover:bg-brand-700',
         variant === 'danger' && 'bg-red-600 text-white hover:bg-red-700',
         variant === 'ghost' && 'text-brand-600 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-800',
@@ -88,7 +88,7 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 export function Label({ children }: { children: ReactNode }) {
-  return <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-brand-400 dark:text-brand-400">{children}</label>
+  return <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-brand-400 dark:text-brand-300">{children}</label>
 }
 
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
@@ -113,7 +113,7 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-serif text-lg font-medium text-brand-900 dark:text-brand-50">{title}</h2>
+              <h2 className="font-serif text-lg font-semibold text-brand-900 dark:text-brand-50">{title}</h2>
               <button onClick={onClose} className="rounded p-1 text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-800">
                 <X size={18} />
               </button>

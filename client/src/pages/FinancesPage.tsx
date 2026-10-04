@@ -1,14 +1,23 @@
-import { useQuery } from '@tanstack/react-query'
+﻿import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { api } from '../lib/api'
-import { Card } from '../components/ui'
+import { Card, EmptyState } from '../components/ui'
 import { DEPENSE_CATEGORIES, labelFor } from '../lib/enums'
-
-const COLORS = ['#397a52', '#6fb085', '#c9a04d', '#9bcaac', '#735129', '#20412e']
+import { useCan } from '../lib/permissions'
+import { CHART_COLORS as COLORS } from '../lib/chartColors'
 
 export default function FinancesPage() {
-  const { data } = useQuery({ queryKey: ['dashboard', 'financial'], queryFn: () => api.get('/dashboard/financial').then((r) => r.data) })
+  const canView = useCan('COLLAB_VIEW_FINANCES')
+  const { data } = useQuery({ queryKey: ['dashboard', 'financial'], queryFn: () => api.get('/dashboard/financial').then((r) => r.data), enabled: canView })
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <EmptyState title="Acces restreint" description="Un administrateur doit vous accorder la permission de consulter la vue financiere." />
+      </div>
+    )
+  }
   if (!data) return null
 
   const caByMonth = Object.entries(data.caByMonth as Record<string, number>)
@@ -22,7 +31,7 @@ export default function FinancesPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
-      <h1 className="font-serif text-2xl font-medium text-brand-900">Vue financiere</h1>
+      <h1 className="font-serif text-2xl font-semibold text-brand-900">Vue financiere</h1>
 
       <div className="grid grid-cols-5 gap-4">
         <Kpi label="CA TTC" value={`${data.totalTTC.toLocaleString('fr-FR')} EUR`} />
@@ -40,7 +49,7 @@ export default function FinancesPage() {
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => `${v.toLocaleString('fr-FR')} EUR`} />
-              <Line type="monotone" dataKey="amount" stroke="#397a52" strokeWidth={2} />
+              <Line type="monotone" dataKey="amount" stroke="#2d5c44" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
@@ -64,7 +73,7 @@ export default function FinancesPage() {
             <XAxis type="number" tick={{ fontSize: 11 }} />
             <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={220} />
             <Tooltip formatter={(v: number) => `${v.toLocaleString('fr-FR')} EUR`} />
-            <Bar dataKey="amount" fill={data.beneficeBrut >= 0 ? '#397a52' : '#dc2626'} radius={[0, 4, 4, 0]} />
+            <Bar dataKey="amount" fill={data.beneficeBrut >= 0 ? '#2d5c44' : '#dc2626'} radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </Card>

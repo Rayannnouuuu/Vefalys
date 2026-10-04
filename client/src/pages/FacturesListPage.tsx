@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -22,7 +22,7 @@ export default function FacturesListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-2xl font-medium text-brand-900">Factures</h1>
+          <h1 className="font-serif text-2xl font-semibold text-brand-900">Factures</h1>
           <p className="text-sm text-brand-400">Suivi des factures promoteurs - importez le document une fois genere par vos soins.</p>
         </div>
         <Button onClick={() => setShowCreate(true)}><Plus size={16} /> Ajouter une facture</Button>

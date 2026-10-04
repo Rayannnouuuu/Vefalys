@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core'
 import { motion, AnimatePresence } from 'motion/react'
@@ -7,7 +7,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { api, apiErrorMessage } from '../lib/api'
 import { Card, Button, Modal, Label, Input, Select, Textarea, Badge } from '../components/ui'
 import { OPPORTUNITY_STAGES, labelFor } from '../lib/enums'
-import { useAuthStore } from '../store/auth'
+import { useCan } from '../lib/permissions'
 import type { Contact, Opportunity } from '../types'
 
 export default function PipelinePage() {
@@ -40,7 +40,7 @@ export default function PipelinePage() {
     <div className="flex h-full flex-col space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-2xl font-medium text-brand-900">Pipeline VEFA</h1>
+          <h1 className="font-serif text-2xl font-semibold text-brand-900">Pipeline VEFA</h1>
           <p className="text-sm text-brand-400">
             Pipeline total : {totalPipeline.toLocaleString('fr-FR')} EUR
             {stats && <span> - Taux de conversion : {stats.conversionRate}%</span>}
@@ -83,8 +83,7 @@ export default function PipelinePage() {
 
 function OpportunityDetailModal({ id, onClose }: { id: string | null; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const currentUser = useAuthStore((s) => s.user)
-  const canDelete = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+  const canDelete = useCan('COLLAB_DELETE_OPPORTUNITIES')
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ title: '', amount: '', probability: '', description: '' })
   const [error, setError] = useState('')

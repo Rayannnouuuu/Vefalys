@@ -9,6 +9,7 @@ import {
   CheckSquare,
   BellRing,
   LineChart,
+  Calculator,
   Moon,
   Sun,
   LogOut,
@@ -18,8 +19,10 @@ import clsx from 'clsx'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
+import { useCan } from '../lib/permissions'
 import GlobalSearch from './GlobalSearch'
 import NotificationsBell from './NotificationsBell'
+import { Logo } from './Logo'
 
 const NAV = [
   { to: '/', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -28,7 +31,8 @@ const NAV = [
   { to: '/relances', label: 'Relances', icon: BellRing },
   { to: '/factures', label: 'Factures', icon: Receipt },
   { to: '/depenses', label: 'Depenses', icon: Wallet },
-  { to: '/finances', label: 'Finances', icon: LineChart },
+  { to: '/finances', label: 'Finances', icon: LineChart, permission: 'COLLAB_VIEW_FINANCES' },
+  { to: '/simulation', label: 'Simulation', icon: Calculator },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/taches', label: 'Taches', icon: CheckSquare },
   { to: '/parametres', label: 'Parametres', icon: Settings },
@@ -36,6 +40,8 @@ const NAV = [
 
 export default function Layout() {
   const user = useAuthStore((s) => s.user)
+  const canViewFinances = useCan('COLLAB_VIEW_FINANCES')
+  const visibleNav = NAV.filter((item) => !item.permission || canViewFinances)
   const logout = useAuthStore((s) => s.logout)
   const dark = useThemeStore((s) => s.dark)
   const toggle = useThemeStore((s) => s.toggle)
@@ -44,12 +50,11 @@ export default function Layout() {
   return (
     <div className="flex h-screen">
       <aside className="flex w-64 flex-col border-r border-brand-100 bg-white dark:border-brand-800 dark:bg-brand-900">
-        <div className="flex items-center gap-2.5 px-6 py-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-accent-400 to-accent-600 font-serif text-sm font-semibold text-white shadow-subtle">V</div>
-          <span className="font-serif text-[18px] font-medium tracking-wide text-brand-900 dark:text-white">Vefalys</span>
+        <div className="px-6 py-6">
+          <Logo />
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
-          {NAV.map((item) => (
+          {visibleNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

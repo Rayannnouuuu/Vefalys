@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'motion/react'
 import { Plus, List, Columns3, Trash2 } from 'lucide-react'
@@ -27,7 +27,7 @@ export default function TasksPage() {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-medium text-brand-900">Taches</h1>
+        <h1 className="font-serif text-2xl font-semibold text-brand-900">Taches</h1>
         <div className="flex gap-2">
           <Button variant={view === 'list' ? 'primary' : 'secondary'} onClick={() => setView('list')}><List size={14} /></Button>
           <Button variant={view === 'kanban' ? 'primary' : 'secondary'} onClick={() => setView('kanban')}><Columns3 size={14} /></Button>

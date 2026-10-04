@@ -10,7 +10,7 @@ import { verifyToken } from './lib/jwt'
 import { attachSocketServer } from './lib/notifications'
 import { errorHandler } from './middleware/errorHandler'
 import { runNotificationSweep } from './services/notificationEngine'
-import { syncCalendlyEvents } from './services/calendlySync.service'
+import { syncAllCalendlyIntegrations } from './services/calendlySync.service'
 import { prisma } from './lib/prisma'
 
 import authRoutes from './routes/auth.routes'
@@ -34,6 +34,9 @@ import uploadsRoutes from './routes/uploads.routes'
 import calendlyRoutes from './routes/calendly.routes'
 import documentsRoutes from './routes/documents.routes'
 import commentsRoutes from './routes/comments.routes'
+import financialSimulationsRoutes from './routes/financialSimulations.routes'
+import permissionsRoutes from './routes/permissions.routes'
+import auditRoutes from './routes/audit.routes'
 
 const app = express()
 const server = http.createServer(app)
@@ -86,6 +89,8 @@ const authLimiter = rateLimit({
 app.use('/api', apiLimiter)
 app.use('/api/auth/login', authLimiter)
 app.use('/api/auth/register', authLimiter)
+app.use('/api/auth/resend-verification', authLimiter)
+app.use('/api/auth/verify-email', authLimiter)
 app.use('/api/users/me/change-password', authLimiter)
 
 app.use('/api/auth', authRoutes)
@@ -109,6 +114,9 @@ app.use('/api/uploads', uploadsRoutes)
 app.use('/api/calendly', calendlyRoutes)
 app.use('/api/documents', documentsRoutes)
 app.use('/api/comments', commentsRoutes)
+app.use('/api/financial-simulations', financialSimulationsRoutes)
+app.use('/api/permissions', permissionsRoutes)
+app.use('/api/audit', auditRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
@@ -134,9 +142,9 @@ function assertProductionConfigSafe() {
 assertProductionConfigSafe()
 
 async function pollCalendlyIfConnected() {
-  const integration = await prisma.calendlyIntegration.findFirst()
-  if (integration) {
-    await syncCalendlyEvents().catch((e) => console.error('calendly sync failed', e))
+  const count = await prisma.calendlyIntegration.count()
+  if (count > 0) {
+    await syncAllCalendlyIntegrations().catch((e) => console.error('calendly sync failed', e))
   }
 }
 

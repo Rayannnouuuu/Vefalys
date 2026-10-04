@@ -7,17 +7,18 @@ html, body, #root {
 }
 
 body {
-  @apply bg-[#f7faf8] text-brand-950 dark:bg-brand-950 dark:text-brand-50 antialiased;
-  font-feature-settings: 'cv11', 'ss01';
+  @apply font-sans bg-brand-50 text-brand-950 dark:bg-brand-950 dark:text-brand-50 antialiased;
+  line-height: 1.55;
 }
 
 * {
   @apply border-brand-100 dark:border-brand-800;
 }
 
-h1, h2, h3, .font-display {
-  font-family: 'Fraunces', ui-serif, Georgia, serif;
-  letter-spacing: -0.01em;
+h1, h2, h3, h4, .font-display {
+  font-family: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  font-weight: 600;
+  line-height: 1.15;
 }
 
 ::selection {
@@ -33,4 +34,23 @@ h1, h2, h3, .font-display {
 }
 ::-webkit-scrollbar-thumb {
   @apply rounded-full bg-brand-200 dark:bg-brand-700;
+}
+
+/* Theme "Noir" : passe les principales surfaces sombres (deja posees via les classes dark:)
+   a un noir quasi pur plutot que le vert-gris fonce du mode sombre par defaut. On cible les
+   classes Tailwind rendues telles quelles dans l'attribut class (selecteur par jeton), ce qui
+   evite de reecrire chaque composant pour un troisieme theme. */
+html.theme-black [class~="dark:bg-brand-950"],
+html.theme-black [class~="dark:bg-brand-900"] {
+  background-color: #000 !important;
+}
+html.theme-black [class~="dark:bg-brand-800"] {
+  background-color: #0e0e0e !important;
+}
+html.theme-black [class~="dark:bg-brand-700"] {
+  background-color: #1a1a1a !important;
+}
+html.theme-black [class~="dark:border-brand-800"],
+html.theme-black [class~="dark:border-brand-700"] {
+  border-color: #242424 !important;
 }

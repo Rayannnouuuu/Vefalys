@@ -30,13 +30,18 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
   // En production, les erreurs non anticipees (status 500) ne doivent pas exposer de details
   // internes au client ; seules les erreurs explicitement levees avec un status (HttpError) le font.
   const exposeMessage = status !== 500 || process.env.NODE_ENV !== 'production'
-  res.status(status).json({ error: exposeMessage ? err?.message || 'Erreur interne du serveur' : 'Erreur interne du serveur' })
+  res.status(status).json({
+    error: exposeMessage ? err?.message || 'Erreur interne du serveur' : 'Erreur interne du serveur',
+    code: exposeMessage && err instanceof HttpError ? err.code : undefined,
+  })
 }
 
 export class HttpError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  code?: string
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }

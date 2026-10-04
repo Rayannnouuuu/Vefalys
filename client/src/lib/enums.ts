@@ -103,6 +103,26 @@ export const APPOINTMENT_TYPES = [
   { value: 'RDV_PHYSIQUE', label: 'RDV physique' },
 ]
 
+export const SIMULATION_OBJECTIFS = [
+  { value: 'PRINCIPALE', label: 'Résidence principale' },
+  { value: 'LOCATIF', label: 'Investissement locatif' },
+  { value: 'SECONDAIRE', label: 'Résidence secondaire' },
+]
+
+export const SIMULATION_TYPES_BIEN = [
+  { value: 'APPARTEMENT_NEUF', label: 'Appartement neuf' },
+  { value: 'MAISON_NEUVE', label: 'Maison neuve' },
+  { value: 'APPARTEMENT_ANCIEN', label: 'Appartement ancien' },
+  { value: 'MAISON_ANCIENNE', label: 'Maison ancienne' },
+]
+
+export const SIMULATION_ZONES = [
+  { value: 'A', label: 'Zone A - Paris, Île-de-France, Côte d\'Azur, grandes métropoles' },
+  { value: 'B1', label: 'Zone B1 - grandes agglomérations, pourtour méditerranéen, DOM' },
+  { value: 'B2', label: 'Zone B2 - villes moyennes' },
+  { value: 'C', label: 'Zone C - reste du territoire' },
+]
+
 export function labelFor(list: { value: string; label: string }[], value: string): string {
   return list.find((i) => i.value === value)?.label || value
 }

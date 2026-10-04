@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
@@ -6,15 +6,14 @@ import { ArrowLeft, Plus, Paperclip, Upload, Pencil, Trash2 } from 'lucide-react
 import { api, apiErrorMessage } from '../lib/api'
 import { Card, Button, Badge, Modal, Label, Input, Select } from '../components/ui'
 import { FACTURE_STATUSES, PAIEMENT_METHODS, labelFor, colorFor } from '../lib/enums'
-import { useAuthStore } from '../store/auth'
+import { useCan } from '../lib/permissions'
 import type { Facture } from '../types'
 
 export default function FactureDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const currentUser = useAuthStore((s) => s.user)
-  const canDelete = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+  const canDelete = useCan('COLLAB_DELETE_FACTURES')
   const [showPayment, setShowPayment] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [error, setError] = useState('')
@@ -64,9 +63,9 @@ export default function FactureDetailPage() {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-brand-400">Promoteur</p>
-          <h1 className="font-serif text-2xl font-medium text-brand-900">{facture.promoterName || 'Non renseigne'}</h1>
+          <h1 className="font-serif text-2xl font-semibold text-brand-900">{facture.promoterName || 'Non renseigne'}</h1>
           <p className="mt-1 text-sm text-brand-500">
-            Client : {facture.contact?.firstName} {facture.contact?.lastName} {'·'} Ref. {facture.reference || facture.number}{facture.isAvoir ? ' (avoir)' : ''}
+            Client : {facture.contact?.firstName} {facture.contact?.lastName} {'Â·'} Ref. {facture.reference || facture.number}{facture.isAvoir ? ' (avoir)' : ''}
           </p>
         </div>
         <div className="flex items-center gap-2">

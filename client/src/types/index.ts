@@ -6,6 +6,17 @@ export interface User {
   role: 'ADMIN' | 'MANAGER' | 'COLLABORATEUR'
   avatarColor: string
   isActive?: boolean
+  emailVerified?: boolean
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
+  approvedAt?: string | null
+  approvedBy?: { id: string; firstName: string; lastName: string } | null
+  createdAt?: string
+}
+
+export interface Permission {
+  key: string
+  label: string
+  enabled: boolean
 }
 
 export interface Tag {
@@ -51,6 +62,42 @@ export interface Contact {
   factures?: any[]
   documents?: ProspectDocument[]
   comments?: Comment[]
+  simulations?: FinancialSimulation[]
+}
+
+export interface FinancialSimulation {
+  id: string
+  contactId?: string | null
+  contact?: { id: string; firstName: string; lastName: string } | null
+  label?: string | null
+  objectif: string
+  typeBien: string
+  primoAccedant: boolean
+  revenusMensuels: number
+  chargesMensuelles: number
+  apport: number
+  dureeAnnees: number
+  tauxPersonnalise?: number | null
+  personnesFoyer: number
+  zone: string
+  revenuFiscalReference?: number | null
+  prixBienVise?: number | null
+  tauxApplique: number
+  mensualiteMax: number
+  capaciteEmprunt: number
+  fraisNotaire: number
+  coutInterets: number
+  tauxEndettement: number
+  budgetFinancable: number
+  ptzEligible: boolean
+  ptzMontant?: number | null
+  ptzMotifInegibilite?: string | null
+  budgetTotalAvecPtz?: number | null
+  cibleMensualite?: number | null
+  cibleMargeMensuelle?: number | null
+  cibleApportSupplementaire?: number | null
+  createdBy?: { id: string; firstName: string; lastName: string } | null
+  createdAt: string
 }
 
 export interface ProspectDocument {
@@ -190,6 +237,7 @@ export interface Appointment {
   contactId?: string | null
   contact?: { id: string; firstName: string; lastName: string } | null
   source: string
+  createdBy?: { id: string; firstName: string; lastName: string; avatarColor: string } | null
 }
 
 export interface Notification {

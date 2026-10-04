@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../lib/prisma'
 import { asyncHandler } from '../middleware/errorHandler'
 import { authenticate, type AuthedRequest } from '../middleware/auth'
+import { requirePermission } from '../lib/permissions'
 
 const router = Router()
 router.use(authenticate)
@@ -63,6 +64,7 @@ router.get(
 
 router.get(
   '/financial',
+  requirePermission('COLLAB_VIEW_FINANCES'),
   asyncHandler(async (_req, res) => {
     const [factures, depenses] = await Promise.all([
       prisma.facture.findMany({ include: { items: true, paiements: true } }),

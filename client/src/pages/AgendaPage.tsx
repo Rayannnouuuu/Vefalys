@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+﻿import { useMemo, useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   startOfMonth,
@@ -55,7 +55,7 @@ export default function AgendaPage() {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-medium text-brand-900">Agenda</h1>
+        <h1 className="font-serif text-2xl font-semibold text-brand-900">Agenda</h1>
         <div className="flex items-center gap-2">
           {calendlyStatus?.connected && (
             <Button variant="secondary" onClick={syncCalendly} disabled={syncing}>
@@ -88,9 +88,18 @@ export default function AgendaPage() {
                     <p
                       key={a.id}
                       onClick={(e) => { e.stopPropagation(); setEditing(a) }}
+                      title={a.createdBy ? `${a.createdBy.firstName} ${a.createdBy.lastName}` : undefined}
                       className="flex items-center gap-1 truncate rounded bg-brand-50 px-1 text-[10px] text-brand-700 hover:bg-brand-100"
                     >
                       {a.source === 'CALENDLY' && <CalendarCheck2 size={9} className="shrink-0" />}
+                      {a.createdBy && (
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full text-[7px] font-semibold leading-3 text-white"
+                          style={{ backgroundColor: a.createdBy.avatarColor }}
+                        >
+                          {a.createdBy.firstName[0]}
+                        </span>
+                      )}
                       {format(new Date(a.startAt), 'HH:mm')} {a.title}
                     </p>
                   ))}

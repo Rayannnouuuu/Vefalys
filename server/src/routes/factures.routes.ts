@@ -2,10 +2,11 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { asyncHandler, HttpError } from '../middleware/errorHandler'
-import { authenticate, requireRole, type AuthedRequest } from '../middleware/auth'
+import { authenticate, type AuthedRequest } from '../middleware/auth'
 import { FACTURE_STATUSES, PAIEMENT_METHODS } from '../lib/enums'
 import { generateFactureNumber } from '../lib/numbering'
 import { logAudit } from '../lib/audit'
+import { requirePermission } from '../lib/permissions'
 
 const router = Router()
 router.use(authenticate)
@@ -192,7 +193,7 @@ router.post(
 
 router.delete(
   '/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requirePermission('COLLAB_DELETE_FACTURES'),
   asyncHandler(async (req: AuthedRequest, res) => {
     await prisma.facture.delete({ where: { id: req.params.id } })
     await logAudit(req.user!.id, 'DELETE', 'Facture', req.params.id)

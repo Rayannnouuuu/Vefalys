@@ -1,14 +1,17 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+﻿import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { MailCheck } from 'lucide-react'
 import { api, apiErrorMessage } from '../lib/api'
-import { useAuthStore } from '../store/auth'
 import { Button, Input, Label } from '../components/ui'
+import { useAuthStore } from '../store/auth'
+import { Logo } from '../components/Logo'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' })
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pending, setPending] = useState<{ email: string } | null>(null)
   const setAuth = useAuthStore((s) => s.setAuth)
   const navigate = useNavigate()
 
@@ -22,8 +25,13 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/register', form)
-      setAuth(data.token, data.user)
-      navigate('/')
+      if (data.pendingVerification) {
+        setPending({ email: data.email })
+      } else {
+        // Premier compte de l'instance : devient admin et est connecte immediatement.
+        setAuth(data.token, data.user)
+        navigate('/')
+      }
     } catch (err) {
       setError(apiErrorMessage(err))
     } finally {
@@ -31,15 +39,32 @@ export default function RegisterPage() {
     }
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f7faf8] px-4">
-      <div className="w-full max-w-sm rounded-xl border border-brand-100 bg-white p-8 shadow-card">
-        <div className="mb-6 flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-accent-400 to-accent-600 font-serif text-sm font-semibold text-white">V</div>
-          <span className="font-serif text-lg font-medium tracking-wide text-brand-900">Vefalys</span>
+  if (pending) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-50 px-4 dark:bg-brand-950">
+        <div className="w-full max-w-sm rounded-xl border border-brand-100 bg-white p-8 text-center shadow-card dark:border-brand-800 dark:bg-brand-900">
+          <MailCheck size={36} className="mx-auto mb-4 text-brand-600 dark:text-brand-400" />
+          <h1 className="mb-2 font-serif text-xl font-semibold text-brand-900 dark:text-white">Confirmez votre email</h1>
+          <p className="text-sm text-brand-500">
+            Un email de confirmation a ete envoye a <span className="font-medium">{pending.email}</span>. Cliquez sur le lien qu'il contient, puis
+            attendez la validation de votre compte par un administrateur.
+          </p>
+          <p className="mt-4 text-sm text-brand-400">
+            <Link to="/connexion" className="font-medium text-accent-600 hover:underline">Retour a la connexion</Link>
+          </p>
         </div>
-        <h1 className="mb-1 font-serif text-2xl font-medium text-brand-900">Creer un compte</h1>
-        <p className="mb-6 text-sm text-brand-400">Le premier compte cree devient administrateur.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-brand-50 px-4 dark:bg-brand-950">
+      <div className="w-full max-w-sm rounded-xl border border-brand-100 bg-white p-8 shadow-card dark:border-brand-800 dark:bg-brand-900">
+        <Logo className="mb-6" />
+        <h1 className="mb-1 font-serif text-2xl font-semibold text-brand-900 dark:text-white">Creer un compte</h1>
+        <p className="mb-6 text-sm text-brand-400">
+          Acces prive : votre email devra etre confirme, puis votre compte valide par un administrateur avant de pouvoir vous connecter.
+        </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>

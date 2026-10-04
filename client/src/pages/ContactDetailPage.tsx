@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, type Variants } from 'motion/react'
@@ -22,11 +22,13 @@ import {
   Download,
   Copy,
   ShieldAlert,
+  Calculator,
 } from 'lucide-react'
 import { api, apiErrorMessage } from '../lib/api'
 import { Button, Card, Badge, Select, Textarea, Modal, Label, Input } from '../components/ui'
 import { CONTACT_STATUSES, CONTACT_SOURCES, INTERACTION_TYPES, RELANCE_TYPES, PROSPECT_DOCUMENT_TYPES, labelFor, colorFor } from '../lib/enums'
 import { useAuthStore } from '../store/auth'
+import { useCan } from '../lib/permissions'
 import type { Contact } from '../types'
 
 const INTERACTION_ICONS: Record<string, any> = { APPEL: Phone, EMAIL: Mail, REUNION: Users2, MESSAGE: MessageSquare, NOTE: StickyNote }
@@ -41,6 +43,8 @@ export default function ContactDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const currentUser = useAuthStore((s) => s.user)
+  const canDelete = useCan('COLLAB_DELETE_CONTACTS')
+  const canAnonymize = useCan('COLLAB_ANONYMIZE_CONTACTS')
   const [showInteraction, setShowInteraction] = useState(false)
   const [showRelance, setShowRelance] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -83,6 +87,12 @@ export default function ContactDetailPage() {
     navigate('/contacts')
   }
 
+  async function handleDelete() {
+    if (!window.confirm('Supprimer definitivement ce contact ? Action irreversible.')) return
+    await api.delete(`/contacts/${id}`)
+    navigate('/contacts')
+  }
+
   async function removeDocument(docId: string) {
     await api.delete(`/documents/${docId}`)
     invalidate()
@@ -108,12 +118,9 @@ export default function ContactDetailPage() {
         </button>
         <div className="flex items-center gap-2">
           <Button variant="ghost" onClick={duplicateContact}><Copy size={14} /> Dupliquer</Button>
-          {isManager && (
-            <>
-              <Button variant="ghost" onClick={exportData}><Download size={14} /> Exporter (RGPD)</Button>
-              <Button variant="ghost" onClick={anonymize}><ShieldAlert size={14} /> Anonymiser</Button>
-            </>
-          )}
+          {isManager && <Button variant="ghost" onClick={exportData}><Download size={14} /> Exporter (RGPD)</Button>}
+          {canAnonymize && <Button variant="ghost" onClick={anonymize}><ShieldAlert size={14} /> Anonymiser</Button>}
+          {canDelete && <Button variant="danger" onClick={handleDelete}><Trash2 size={14} /> Supprimer</Button>}
         </div>
       </div>
 
@@ -123,7 +130,7 @@ export default function ContactDetailPage() {
             <Card>
               <div className="flex items-start justify-between">
                 <div>
-                  <h1 className="font-serif text-xl font-medium text-brand-900">{contact.firstName} {contact.lastName}</h1>
+                  <h1 className="font-serif text-xl font-semibold text-brand-900">{contact.firstName} {contact.lastName}</h1>
                   <p className="text-sm text-brand-400">{contact.company}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -289,7 +296,7 @@ export default function ContactDetailPage() {
                   <div key={c.id} className="flex gap-2 text-sm">
                     <div
                       className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
-                      style={{ backgroundColor: c.user?.avatarColor || '#397a52' }}
+                      style={{ backgroundColor: c.user?.avatarColor || '#2d5c44' }}
                     >
                       {c.user?.firstName[0]}{c.user?.lastName[0]}
                     </div>
@@ -304,6 +311,26 @@ export default function ContactDetailPage() {
           </motion.div>
 
           <motion.div variants={fadeUp} initial="hidden" animate="show" custom={3}>
+            <Card>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-brand-500"><Calculator size={15} /> Simulations financiÃ¨res</h2>
+                <Link to={`/simulation?contactId=${id}`}><Button variant="secondary"><Plus size={14} /> Nouvelle</Button></Link>
+              </div>
+              {!contact.simulations?.length && <p className="text-sm text-brand-400">Aucune simulation rÃ©alisÃ©e pour ce prospect.</p>}
+              <div className="space-y-2">
+                {contact.simulations?.map((s) => (
+                  <div key={s.id} className="rounded-lg border border-brand-100 p-2 text-sm">
+                    <p className="font-medium text-brand-800">{Math.round(s.budgetTotalAvecPtz ?? s.budgetFinancable).toLocaleString('fr-FR')} EUR finanÃ§ables</p>
+                    <p className="text-xs text-brand-400">
+                      {format(new Date(s.createdAt), 'dd/MM/yyyy')}{s.ptzEligible ? ' - PTZ eligible' : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} initial="hidden" animate="show" custom={4}>
             <Card>
               <h2 className="mb-3 text-sm font-semibold text-brand-500">Factures</h2>
               {!contact.factures?.length && <p className="text-sm text-brand-400">Aucune facture.</p>}

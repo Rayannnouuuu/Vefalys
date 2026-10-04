@@ -1,12 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
+﻿import { useQuery } from '@tanstack/react-query'
 import { motion, type Variants } from 'motion/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { Lightbulb, TrendingUp, Users, BellRing, Receipt, Target } from 'lucide-react'
 import { api } from '../lib/api'
 import { Card } from '../components/ui'
 import { labelFor, OPPORTUNITY_STAGES, CONTACT_STATUSES, CONTACT_SOURCES } from '../lib/enums'
-
-const COLORS = ['#397a52', '#6fb085', '#c9a04d', '#9bcaac', '#735129', '#20412e']
+import { useCan } from '../lib/permissions'
+import { CHART_COLORS as COLORS } from '../lib/chartColors'
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 10 },
@@ -14,8 +14,13 @@ const fadeUp: Variants = {
 }
 
 export default function DashboardPage() {
+  const canViewFinances = useCan('COLLAB_VIEW_FINANCES')
   const { data } = useQuery({ queryKey: ['dashboard', 'commercial'], queryFn: () => api.get('/dashboard/commercial').then((r) => r.data) })
-  const { data: financial } = useQuery({ queryKey: ['dashboard', 'financial'], queryFn: () => api.get('/dashboard/financial').then((r) => r.data) })
+  const { data: financial } = useQuery({
+    queryKey: ['dashboard', 'financial'],
+    queryFn: () => api.get('/dashboard/financial').then((r) => r.data),
+    enabled: canViewFinances,
+  })
   const { data: analytics } = useQuery({ queryKey: ['dashboard', 'analytics'], queryFn: () => api.get('/dashboard/analytics').then((r) => r.data) })
 
   if (!data) return null
@@ -27,7 +32,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-serif text-2xl font-medium text-brand-900">Tableau de bord</h1>
+      <h1 className="font-serif text-2xl font-semibold text-brand-900">Tableau de bord</h1>
 
       {data.insights.length > 0 && (
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0} className="space-y-2">
@@ -40,7 +45,13 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1} className="grid grid-cols-5 gap-4">
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="show"
+        custom={1}
+        className={`grid gap-4 ${canViewFinances ? 'grid-cols-5' : 'grid-cols-4'}`}
+      >
         <Card>
           <div className="flex items-center gap-2 text-brand-400">
             <Users size={16} />
@@ -63,13 +74,15 @@ export default function DashboardPage() {
           <p className="mt-2 text-2xl font-semibold text-brand-900">{data.closedThisMonthCount}</p>
           <p className="text-xs text-brand-400">{data.closedThisMonthAmount.toLocaleString('fr-FR')} EUR</p>
         </Card>
-        <Card>
-          <div className="flex items-center gap-2 text-brand-400">
-            <Receipt size={16} />
-            <span className="text-xs">Factures en attente</span>
-          </div>
-          <p className="mt-2 text-2xl font-semibold text-brand-900">{financial ? financial.totalUnpaid.toLocaleString('fr-FR') : '-'} EUR</p>
-        </Card>
+        {canViewFinances && (
+          <Card>
+            <div className="flex items-center gap-2 text-brand-400">
+              <Receipt size={16} />
+              <span className="text-xs">Factures en attente</span>
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-brand-900">{financial ? financial.totalUnpaid.toLocaleString('fr-FR') : '-'} EUR</p>
+          </Card>
+        )}
         <Card>
           <div className="flex items-center gap-2 text-brand-400">
             <Target size={16} />
@@ -87,7 +100,7 @@ export default function DashboardPage() {
               <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => `${v.toLocaleString('fr-FR')} EUR`} />
-              <Bar dataKey="amount" fill="#397a52" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="amount" fill="#2d5c44" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -115,8 +128,8 @@ export default function DashboardPage() {
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Line type="monotone" dataKey="newContacts" name="Nouveaux contacts" stroke="#397a52" strokeWidth={2} />
-                <Line type="monotone" dataKey="wonAmount" name="CA gagne" stroke="#c9a04d" strokeWidth={2} />
+                <Line type="monotone" dataKey="newContacts" name="Nouveaux contacts" stroke="#2d5c44" strokeWidth={2} />
+                <Line type="monotone" dataKey="wonAmount" name="CA gagne" stroke="#b8944f" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </Card>

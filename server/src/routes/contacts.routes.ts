@@ -2,9 +2,10 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { asyncHandler, HttpError } from '../middleware/errorHandler'
-import { authenticate, requireRole, type AuthedRequest } from '../middleware/auth'
+import { authenticate, type AuthedRequest } from '../middleware/auth'
 import { logAudit } from '../lib/audit'
 import { CONTACT_STATUSES, CONTACT_SOURCES } from '../lib/enums'
+import { requirePermission } from '../lib/permissions'
 
 const router = Router()
 router.use(authenticate)
@@ -77,6 +78,7 @@ router.get(
         factures: { orderBy: { issueDate: 'desc' } },
         documents: { orderBy: { uploadedAt: 'desc' }, include: { uploadedBy: { select: { firstName: true, lastName: true } } } },
         comments: { orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, firstName: true, lastName: true, avatarColor: true } } } },
+        simulations: { orderBy: { createdAt: 'desc' } },
       },
     })
     if (!contact) throw new HttpError(404, 'Contact introuvable')
@@ -167,7 +169,7 @@ router.post(
 
 router.delete(
   '/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requirePermission('COLLAB_DELETE_CONTACTS'),
   asyncHandler(async (req: AuthedRequest, res) => {
     await prisma.contact.delete({ where: { id: req.params.id } })
     await logAudit(req.user!.id, 'DELETE', 'Contact', req.params.id)
@@ -202,7 +204,7 @@ router.get(
 // --- RGPD : droit a l'oubli - anonymise les donnees personnelles, conserve l'historique financier legal ---
 router.post(
   '/:id/anonymize',
-  requireRole('ADMIN', 'MANAGER'),
+  requirePermission('COLLAB_ANONYMIZE_CONTACTS'),
   asyncHandler(async (req: AuthedRequest, res) => {
     await prisma.$transaction([
       prisma.prospectDocument.deleteMany({ where: { contactId: req.params.id } }),
